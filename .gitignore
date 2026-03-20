@@ -1,0 +1,3 @@
+.streamlit/secrets.toml
+.env
+.api_counter.json
