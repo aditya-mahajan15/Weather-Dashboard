@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from api import search_locations, get_weather_onecall_by_coords, WeatherAPIError
+from counter import get_today_api_calls
 
 st.set_page_config(page_title="Weather Dashboard", layout="wide")
 
@@ -275,3 +276,28 @@ if city:
         st.error(str(e))
     except Exception as e:
         st.error(f"Unexpected error: {e}")
+
+try:
+    total_calls = get_today_api_calls()
+except Exception:
+    total_calls = "Unavailable"
+
+st.markdown(
+    f"""
+    <div style="
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background-color: rgba(0, 0, 0, 0.75);
+        color: white;
+        padding: 10px 14px;
+        border-radius: 10px;
+        font-size: 14px;
+        z-index: 9999;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    ">
+        Total API Calls: {total_calls}
+    </div>
+    """,
+    unsafe_allow_html=True
+)

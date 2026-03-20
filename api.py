@@ -1,11 +1,9 @@
 import os
 import streamlit as st
 import requests
-import json
-from datetime import date
+from counter import get_today_api_calls, increment_total_api_calls
 
-LIMIT = 800
-COUNTER_FILE = "api_counter.json"
+DAILY_LIMIT = 800
 
 API_KEY = st.secrets.get("OPENWEATHER_API_KEY") or os.getenv("OPENWEATHER_API_KEY", "")
 
@@ -17,39 +15,31 @@ class WeatherAPIError(Exception):
     pass
 
 
-def check_api_limit():
-    today = str(date.today())
-
-    try:
-        with open(COUNTER_FILE, "r") as f:
-            data = json.load(f)
-    except Exception:
-        data = {"date": today, "count": 0}
-
-    if data["date"] != today:
-        data = {"date": today, "count": 0}
-
-    if data["count"] >= LIMIT:
-        raise WeatherAPIError(f"Daily API limit reached ({LIMIT} calls).")
-
-    data["count"] += 1
-
-    with open(COUNTER_FILE, "w") as f:
-        json.dump(data, f)
-
 
 def _get_json(url: str, params: dict):
-    check_api_limit()
 
     if not API_KEY:
-        raise WeatherAPIError("Missing API key. Set OPENWEATHER_API_KEY environment variable.")
+        raise WeatherAPIError("Missing API key.")
+    
+    today_calls = get_today_api_calls()
+    if today_calls >= DAILY_LIMIT:
+        raise WeatherAPIError(
+            "Daily API limit reached (800 calls). Please try again tomorrow."
+        )
 
     params = {**params, "appid": API_KEY}
-    r = requests.get(url, params=params, timeout=15)
-    data = r.json()
 
-    # Geocoding endpoint returns a list
+    try:
+        r = requests.get(url, params=params, timeout=15)
+        r.raise_for_status()
+        data = r.json()
+    except requests.RequestException as e:
+        raise WeatherAPIError(f"Request failed: {e}")
+    except ValueError:
+        raise WeatherAPIError("Invalid response received from OpenWeather API.")
+
     if isinstance(data, list):
+        increment_total_api_calls()
         return data
 
     cod = str(data.get("cod", r.status_code))
@@ -57,6 +47,7 @@ def _get_json(url: str, params: dict):
         msg = data.get("message", "Unknown API error")
         raise WeatherAPIError(f"OpenWeather error ({cod}): {msg}")
 
+    increment_total_api_calls()
     return data
 
 
