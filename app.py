@@ -279,25 +279,6 @@ if city:
 
 try:
     total_calls = get_today_api_calls()
+    st.caption(f"API Calls Today: {total_calls}/800")
 except Exception:
-    total_calls = "Unavailable"
-
-st.markdown(
-    f"""
-    <div style="
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        background-color: rgba(0, 0, 0, 0.75);
-        color: white;
-        padding: 10px 14px;
-        border-radius: 10px;
-        font-size: 14px;
-        z-index: 9999;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-    ">
-        Total API Calls: {total_calls}
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+    st.caption("API Calls Today: Unavailable")
