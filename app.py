@@ -279,6 +279,6 @@ if city:
 
 try:
     total_calls = get_today_api_calls()
-    st.caption(f"API Calls Today: {total_calls}/800")
+    st.caption(f"API Calls Today: {total_calls}")
 except Exception:
     st.caption("API Calls Today: Unavailable")
