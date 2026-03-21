@@ -6,6 +6,7 @@ from counter import get_today_api_calls
 
 st.set_page_config(page_title="Weather Dashboard", layout="wide")
 
+# Global CSS customizations used to improve metric and card styling across the app.
 st.markdown("""
 <style>
     .main > div {
@@ -69,11 +70,13 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("Weather & Climate Monitoring Dashboard")
+st.title("Weather & Monitoring Dashboard")
 st.caption("Live current conditions, hourly outlook, and 5-day forecast")
 
+# Search input is one of the few user-controlled filters in this dashboard.
 city = st.sidebar.text_input("Search location", "Melbourne")
 
+# Manual refresh clears cached API results for the current session.
 if st.sidebar.button("Refresh Now"):
     st.cache_data.clear()
     st.rerun()
@@ -81,21 +84,34 @@ if st.sidebar.button("Refresh Now"):
 
 @st.cache_data(ttl=600)
 def load_locations(city_name: str):
+    """Memoized lookup of city candidates from geocoding endpoint."""
     return search_locations(city_name)
 
 
 @st.cache_data(ttl=600)
 def load_weather(lat: float, lon: float):
+    """Memoized weather fetch for lat/lon to reduce repeated billing hits."""
     return get_weather_onecall_by_coords(lat, lon)
 
 
 def format_location(loc: dict) -> str:
+    """Display-friendly location label from geocoding record."""
     parts = [loc.get("name", "")]
     if loc.get("state"):
         parts.append(loc["state"])
     if loc.get("country"):
         parts.append(loc["country"])
     return ", ".join(parts)
+
+#Convert numeric AQI values into user-friendly text categories.
+def aqi_category(aqi: int) -> str:
+    return {
+        1: "Good",
+        2: "Fair",
+        3: "Moderate",
+        4: "Poor",
+        5: "Very Poor",
+    }.get(aqi, "Unknown")
 
 
 if city:
@@ -121,21 +137,37 @@ if city:
             unsafe_allow_html=True
         )
 
-        metric_cols = st.columns(5)
+        # Top-level weather metrics displayed in the dashboard header row.
+        metric_cols = st.columns(6)
         metric_cols[0].metric("Temperature (°C)", f"{round(current['temp'])}")
         metric_cols[1].metric("Humidity (%)", f"{round(current['humidity'])}")
         metric_cols[2].metric("Wind Speed (km/h)", f"{round(current['wind_speed'] * 3.6)}")
         metric_cols[3].metric("Feels Like (°C)", f"{round(current['feels_like'])}")
         metric_cols[4].metric("Temperature Range (°C)", f"{round(current['temp_min'])} - {round(current['temp_max'])}")
+        metric_cols[5].metric("Air Quality", aqi_category(current.get('aqi', 0)))
 
-       
+        # Temporarily store timezone offset for localizing forecasts.
         timezone_offset = current["timezone_offset"]
 
+        # Display active weather alerts from One Call API before AQI status.
         if current["alerts"]:
             for alert in current["alerts"]:
                 st.warning(f"⚠ {alert['event']}")
         else:
             st.info("No active weather alerts")
+
+        # AQI alert appears in the same style and helps users act on air quality.
+        aqi_value = current.get('aqi')
+        aqi_text = aqi_category(aqi_value if aqi_value is not None else 0)
+
+        if aqi_value is None:
+            st.info("AQI information not available")
+        elif aqi_value <= 2:
+            st.info(f"AQI: {aqi_text} (Good/Fair) - air quality is acceptable.")
+        elif aqi_value == 3:
+            st.warning(f"AQI: {aqi_text} - some pollution is present; sensitive groups should take care.")
+        else:
+            st.error(f"⚠ AQI: {aqi_text} - unhealthy air quality. Take precautions.")
 
         st.markdown("### Hourly Forecast")
 
@@ -143,6 +175,7 @@ if city:
         sunset_dt = pd.to_datetime(current["sunset"] + timezone_offset, unit="s")
         visible_hourly = current["hourly"][1:10]
 
+        # Build hourly card model with an optional sunrise/sunset special card insertion.
         cards = [{
             "label": "Now",
             "icon": current["hourly"][0]["weather"][0]["icon"],
@@ -222,6 +255,7 @@ if city:
 
         daily = current["daily"][:5]
 
+        # Build DataFrame for 5-day temperature forecast chart.
         df = pd.DataFrame({
             "date": [pd.to_datetime(day["dt"] + timezone_offset, unit="s") for day in daily],
             "Min Temp (°C)": [round(day["temp"]["min"]) for day in daily],
@@ -278,6 +312,7 @@ if city:
         st.error(f"Unexpected error: {e}")
 
 try:
+    # Show daily One Call API usage (metered); free geocode/AQI calls are not counted.
     total_calls = get_today_api_calls()
     st.caption(f"API Calls Today: {total_calls}")
 except Exception:
