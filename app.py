@@ -70,7 +70,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("Weather & Monitoring Dashboard")
+st.title("Weather Monitoring Dashboard")
 st.caption("Live current conditions, hourly outlook, and 5-day forecast")
 
 # Search input is one of the few user-controlled filters in this dashboard.
